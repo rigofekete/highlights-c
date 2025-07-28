@@ -21,21 +21,8 @@ typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
 
-
 #define global_variable static
 #define internal static
-
-// TODO: place this in a helper or global vars file
-static void logging(const char* fmt, ...)
-{
-	va_list args;
-	fprintf(stderr, "LOG: ");
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-	fprintf(stderr, "\n");
-}
-
 struct ScreenRecorder 
 {
 	AVFormatContext* input_container;
@@ -43,6 +30,9 @@ struct ScreenRecorder
 	int fps;
 	int x, y, width, height;
 };
+
+global_variable ScreenRecorder recorder;
+
 
 internal bool get_dpi_aware_window_rect(const char* window_name)
 {
@@ -57,19 +47,25 @@ internal bool get_dpi_aware_window_rect(const char* window_name)
 		return false;
 	}
 
+	// TODO: check if this is really needed in this version
+	// ShowWindow(hwnd, SW_MINIMIZE);
 	ShowWindow(hwnd, SW_RESTORE);
 	SetForegroundWindow(hwnd);
 
 	RECT rect;
 	GetWindowRect(hwnd, &rect);
-	int width = rect.right - rect.left;
-	int height = rect.bottom - rect.top;
-
+	
 	uint8 dpi = GetDpiForWindow(hwnd);
 
-	dpi = dpi / 96;
+	float dpi_scale = dpi / 96.0;
+	
+	recorder.x = rect.left * dpi_scale + 10;
+	recorder.y = rect.top * dpi_scale + 20;
+	recorder.width = (rect.right - rect.left) * dpi_scale - 20;
+	recorder.height = (rect.bottom - rect.top) * dpi_scale - 20;
 
-
+	recorder.width = recorder.width - (recorder.width % 2);
+	recorder.height = recorder.height - (recorder.height % 2);
 
 	return true;
 }
@@ -77,7 +73,7 @@ internal bool get_dpi_aware_window_rect(const char* window_name)
 
 
 
-internal bool CaptureScreen(ScreenRecorder* recorder, const char* window_name)
+internal bool CaptureScreen(const char* window_name)
 {
 	// TODO: check if it isn't better to make a global dimension struct
 	RECT rect;
@@ -94,11 +90,9 @@ internal bool CaptureScreen(ScreenRecorder* recorder, const char* window_name)
 
 int main(int argc, const char* argv[])
 {
-	ScreenRecorder recorder;
-
-	if(!CaptureScreen(&recorder, "Calculator"))
+	if(!CaptureScreen("PCSX2 v2.4.0"))
 	{
-		logging("Error capturing screen");
+		printf("Error capturing screen");
 	}
 
 
