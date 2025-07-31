@@ -1,80 +1,4 @@
-// The extern "C" block tells the C++ compiler "don't mangle these function names"
-// When compiling in c++ we will get a dll linking error if we do not do this
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavdevice/avdevice.h>
-#include <libswscale/swscale.h>
-#include <libavutil/avutil.h>
-// #include <libavutil/time.h>
-}
-
-
-#include <windows.h>
-#include <stdio.h>
-#include <time.h>
-// #include <stdlib.h>
-// #include <stdarg.h>
-// #include <string.h>
-// #include <inttypes.h>
-
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef int64_t int64;
-
-#define global_variable static
-#define internal static
-
-
-// Add this function to check FFmpeg version
-void check_ffmpeg_version() 
-{
-    unsigned int version = avutil_version();
-    int major = (version >> 16) & 0xFF;
-    int minor = (version >> 8) & 0xFF;
-    int micro = version & 0xFF;
-    
-    printf("FFmpeg libavutil version: %d.%d.%d\n", major, minor, micro);
-    printf("FFmpeg version string: %s\n", av_version_info());
-    
-    // FFmpeg 6.0+ is needed for ddagrab
-    if (major >= 60) {  // libavutil 58+ corresponds to FFmpeg 6.0+
-        printf("ddagrab should be available\n");
-    } else {
-        printf("ddagrab requires FFmpeg 6.0+, upgrade needed\n");
-    }
-}
-
-struct ScreenRecorder 
-{
-	// Containers and streams
-	AVFormatContext* input_container;
-	const AVInputFormat* input_format;
-
-	AVFormatContext* output_container;
-	AVStream* output_stream;
-
-	AVCodecContext* codec_context;
-	const AVCodec* codec;
-
-	int output_index = 0;
-	bool output_ready = false;
-
-
-	int fps;
-	int x, y, width, height;
-};
-
-
-// NOTE: when defining a struct as static, all of its members are automatically set to 0/NULL/false
-// But, we still explicitly initialize all members to 0 for clarity.
-// NOTE: Since we are compiling in C++ we need to use the initialization list syntax {} instead of = 0 
-global_variable ScreenRecorder recorder = {};
-
+#include "recording.h"
 
 internal bool get_dpi_aware_window_rect(const char* window_name)
 {
@@ -109,10 +33,29 @@ internal bool get_dpi_aware_window_rect(const char* window_name)
 	recorder.width = recorder.width - (recorder.width % 2);
 	recorder.height = recorder.height - (recorder.height % 2);
 
+	printf("\nDPI aware coordinates: x=%d y=%d w=%d h=%d\n", 
+	       recorder.x, recorder.y, recorder.width, recorder.height);
 	return true;
 }
 
 
+
+// void scale_coordinates_for_ddagrab(DdagrabDimensions* dd) 
+// {
+//     // Scale coordinates for gdigrab
+//     float scale_factor = 2490.0f / 3840.0f;
+//     dd->x = (int)(recorder.x * scale_factor);
+//     dd->y = (int)(recorder.y * scale_factor);
+//     dd->width = (int)(recorder.width * scale_factor);
+//     dd->height = (int)(recorder.height * scale_factor);
+//
+//     // Make even
+//     dd->width = dd->width - (dd->width % 2);
+//     dd->height = dd->height - (dd->height % 2);
+//
+//     printf("Scaled coordinates: x=%d y=%d w=%d h=%d\n", 
+//            dd->x, dd->y, dd->width, dd->height);
+// }
 
 
 internal bool capture_screen(const char* window_name)
@@ -122,6 +65,12 @@ internal bool capture_screen(const char* window_name)
 		printf("\nError while adjusting window title dpi");
 		return false;
 	}
+
+	// TODO: I believe we need to scale the coordinates for ddagrab in separate dimension variables 
+	// so that the gdigrab detection iteration is not affected
+	// TODO I think we might not even need to scale this, we will crop the generated mkv files 
+	// with custom function
+
 
 	// Find gdigrab input format
 	recorder.input_format = av_find_input_format("gdigrab");
@@ -445,14 +394,20 @@ internal bool process_frames()
   DWORD start_time = GetTickCount();
   int64 pts = 0;
 
+  start_live_recording();
+
+
   // Main processing loop
   while(true)
   {
-    if(GetAsyncKeyState('Q') & 0x8001)
+    // TODO this is here only for testing, we will need to detect ROIs and trigger recording and ring buffer flush
+    if(GetAsyncKeyState('S') & 0x8001)
     {
-      printf("\n'Q' key press, stopping capture...");
+      printf("\n'S' key press, stopping manual frame capture...");
+      stop_live_recording();
       break;
     }
+
 
     if(av_read_frame(recorder.input_container, input_packet) < 0)
     {
@@ -505,12 +460,12 @@ internal bool process_frames()
 				   recorder.codec_context->time_base,
 				   recorder.output_stream->time_base);
 
-	      // Write packet to output file
-	      if(av_write_frame(recorder.output_container, output_packet) < 0)
-	      {
+		     // Write packet to output file
+		     if(av_write_frame(recorder.output_container, output_packet) < 0)
+		     {
 		printf("\nERROR: Coudld not write frame");
 
-	      }
+		     }
 
 	      av_packet_unref(output_packet);
 	    }
@@ -537,8 +492,8 @@ internal bool process_frames()
   {
     output_packet->stream_index = recorder.output_stream->index;
     av_packet_rescale_ts(output_packet,
-			 recorder.codec_context->time_base,
-			 recorder.output_stream->time_base);
+  	 recorder.codec_context->time_base,
+  	 recorder.output_stream->time_base);
     av_write_frame(recorder.output_container, output_packet);
     av_packet_unref(output_packet);
   }
@@ -560,8 +515,7 @@ internal bool process_frames()
 
 int main(int argc, const char* argv[])
 {
-	// check_ffmpeg_version();
-	if(!init_screen_recorder("Ultimate World Soccer Winning Eleven 7 - Hack Edition", 60))
+	if(!init_screen_recorder("Ultimate World Soccer Winning Eleven 7 - Hack Edition", 30))
 	// if(!init_screen_recorder("Pro Evolution Soccer 2", 60))
 	// if(!init_screen_recorder("PCSX2 v2.2.0", 30))
 	{
@@ -570,7 +524,12 @@ int main(int argc, const char* argv[])
 
 	process_frames();
 
-	
+	printf("\nFixing all MKV files...\n");
+        batch_fix_all_mkv_files();
+
+
+	printf("\nCropping all MKV files...\n");
+	batch_crop_all_files_in_live_folder(); 
 
 
 	return 0;

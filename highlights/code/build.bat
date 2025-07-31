@@ -11,7 +11,7 @@ pushd ..\..\build
 
 REM compile the cpp with the linked lib to our build folder // For documentation on cl commands used read the cmdnotes.txt
 
-cl /FC /Zi /I"C:\ffmpeg\include" ..\highlights\code\recording.cpp /link user32.lib /LIBPATH:"C:\ffmpeg\lib" avcodec.lib avformat.lib avdevice.lib avutil.lib swresample.lib swscale.lib
+cl /FC /Zi /I"C:\ffmpeg\include" ..\highlights\code\recording.cpp ..\highlights\code\ffmpeg_recording.cpp /link user32.lib /LIBPATH:"C:\ffmpeg\lib" avcodec.lib avformat.lib avdevice.lib avutil.lib swresample.lib swscale.lib
 
 REM pop the previous directory so we can go to the location we were before the pushd
 
