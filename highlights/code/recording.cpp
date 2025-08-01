@@ -40,90 +40,161 @@ internal bool get_dpi_aware_window_rect(const char* window_name)
 
 
 
-// void scale_coordinates_for_ddagrab(DdagrabDimensions* dd) 
-// {
-//     // Scale coordinates for gdigrab
-//     float scale_factor = 2490.0f / 3840.0f;
-//     dd->x = (int)(recorder.x * scale_factor);
-//     dd->y = (int)(recorder.y * scale_factor);
-//     dd->width = (int)(recorder.width * scale_factor);
-//     dd->height = (int)(recorder.height * scale_factor);
-//
-//     // Make even
-//     dd->width = dd->width - (dd->width % 2);
-//     dd->height = dd->height - (dd->height % 2);
-//
-//     printf("Scaled coordinates: x=%d y=%d w=%d h=%d\n", 
-//            dd->x, dd->y, dd->width, dd->height);
-// }
+bool region_targets(const char* window_name)
+{
+  // TODO: Always set the num of targets we will compute and allocate
+  recorder.num_targets = 1;
+
+  // Goal scorer player name
+  int x_name = recorder.width / 2 - 390;
+  int y_name = recorder.height - 380;
+
+  int w_name = recorder.width / 6;
+  int h_name = recorder.height / 10 - 120;
+
+  w_name = w_name - (w_name % 2);
+  h_name = h_name - (h_name % 2);
+
+  recorder.targets = (ROI*)malloc(recorder.num_targets * sizeof(ROI));
+  if(!recorder.targets)
+  {
+    return false;
+  }
+
+  // TODO: assign ROIs according to defined num_targets value!
+  *recorder.targets = {x_name, y_name, w_name, h_name};
+  // *(recorder.targets + 1) = {x_name, y_name, w_name, h_name};
+
+  // // OR simple array syntax
+  // recorder.targets[0] = {x_name, y_name, w_name, h_name};
+  
+  return true;
+}
+
+
+CroppedRegion* crop_region(uint8* frame_data, int frame_width, int frame_height,
+			    int frame_linesize, ROI roi)
+{
+  CroppedRegion* region = (CroppedRegion*)malloc(sizeof(CroppedRegion));
+  if(!region)
+  {
+    printf("ERROR: CroppedRegion allocation failed");
+    return NULL;
+  }
+
+  region->width = roi.width;
+  region->height = roi.height;
+  // 3 bytes per pixel for BGR24
+  region->linesize = roi.width * 3; 
+
+  // Allocate memory for cropped region
+  region->data = (uint8*)malloc(region->height * region->linesize);
+  if(!region->data)
+  {
+    free(region);
+    printf("ERROR: data allocation for cropped region failed");
+    return NULL;
+  }
+
+  // copy cropped data
+  for(int y = 0; y < roi.height; y++)
+  {
+    uint8* src = frame_data + ((roi.y + y) * frame_linesize) + (roi.x * 3);
+    uint8* dst = region->data + (y * region->linesize);
+    memcpy(dst, src, roi.width * 3);
+  }
+
+  return region;
+}
+
+
+
+void free_cropped_region(CroppedRegion* region)
+{
+  if(region)
+  {
+    if(region->data)
+    {
+      free(region->data);
+    }
+
+    free(region);
+  }
+}
 
 
 internal bool capture_screen(const char* window_name)
 {
-	if(!get_dpi_aware_window_rect(window_name))
-	{
-		printf("\nError while adjusting window title dpi");
-		return false;
-	}
-
-	// TODO: I believe we need to scale the coordinates for ddagrab in separate dimension variables 
-	// so that the gdigrab detection iteration is not affected
-	// TODO I think we might not even need to scale this, we will crop the generated mkv files 
-	// with custom function
-
-
-	// Find gdigrab input format
-	recorder.input_format = av_find_input_format("gdigrab");
-	if(!recorder.input_format) {
-	  printf("ERROR could not find gdigrab");
+  if(!get_dpi_aware_window_rect(window_name))
+  {
+	  printf("\nError while adjusting window title dpi");
 	  return false;
-	}
+  }
 
-	AVDictionary* options = NULL;
-
-	char fps_str[8], offset_x_str[8], offset_y_str[8], video_size_str[16];
-	snprintf(fps_str, sizeof(fps_str), "%d", recorder.fps);
-	snprintf(offset_x_str, sizeof(offset_x_str), "%d", recorder.x);
-	snprintf(offset_y_str, sizeof(offset_y_str), "%d", recorder.y);
-	snprintf(video_size_str, sizeof(video_size_str), "%dx%d", recorder.width, recorder.height);
-
-
-	av_dict_set(&options, "framerate", fps_str, 0);
-	av_dict_set(&options, "offset_x", offset_x_str, 0);
-	av_dict_set(&options, "offset_y", offset_y_str, 0);
-	av_dict_set(&options, "video_size", video_size_str, 0);
-	av_dict_set(&options, "show_region", "0", 0);
+  if(!region_targets(window_name))
+  {
+    printf("ROIs allocation for array failed");
+    return false;
+  }
+  else
+  {
+    printf("ROIs successfully generated!");
+  }
 
 
-	recorder.input_container = avformat_alloc_context();
-	if(!recorder.input_container) {
-	  printf("ERROR could not allocate format context");
-	  av_dict_free(&options);
-	  return false;
-	}
+  // Find gdigrab input format
+  recorder.input_format = av_find_input_format("gdigrab");
+  if(!recorder.input_format) 
+  {
+    printf("ERROR could not find gdigrab");
+    return false;
+  }
+
+  AVDictionary* options = NULL;
+
+  char fps_str[8], offset_x_str[8], offset_y_str[8], video_size_str[16];
+  snprintf(fps_str, sizeof(fps_str), "%d", recorder.fps);
+  snprintf(offset_x_str, sizeof(offset_x_str), "%d", recorder.x);
+  snprintf(offset_y_str, sizeof(offset_y_str), "%d", recorder.y);
+  snprintf(video_size_str, sizeof(video_size_str), "%dx%d", recorder.width, recorder.height);
 
 
-	recorder.input_container = avformat_alloc_context();
-	if(!recorder.input_container) {
-	  printf("\nERROR could not allocate format context");
-	  return false;
-	}
-
-	if(avformat_open_input(&recorder.input_container, "desktop",
-	   recorder.input_format, &options) != 0)
-	{
-	  printf("ERROR could not open desktop capture");
-	  avformat_free_context(recorder.input_container);
-	  av_dict_free(&options);
-	  return false;
-	}
+  av_dict_set(&options, "framerate", fps_str, 0);
+  av_dict_set(&options, "offset_x", offset_x_str, 0);
+  av_dict_set(&options, "offset_y", offset_y_str, 0);
+  av_dict_set(&options, "video_size", video_size_str, 0);
+  av_dict_set(&options, "show_region", "0", 0);
 
 
-	// NOTE: Once the input container is open we dont need the dict any longer.
-	av_dict_free(&options);
-	
-	printf("\nCapture setup successfully started.\n");
-	return true;
+  recorder.input_container = avformat_alloc_context();
+  if(!recorder.input_container) 
+  {
+    printf("ERROR could not allocate format context");
+    av_dict_free(&options);
+    return false;
+  }
+
+  // recorder.input_container = avformat_alloc_context();
+  // if(!recorder.input_container) {
+  //   printf("\nERROR could not allocate format context");
+  //   return false;
+  // }
+
+  if(avformat_open_input(&recorder.input_container, "desktop",
+     recorder.input_format, &options) != 0)
+  {
+    printf("ERROR could not open desktop capture");
+    avformat_free_context(recorder.input_container);
+    av_dict_free(&options);
+    return false;
+  }
+
+
+  // NOTE: Once the input container is open we dont need the dict any longer.
+  av_dict_free(&options);
+  
+  printf("\nCapture setup successfully started.\n");
+  return true;
 }
 
 
@@ -282,7 +353,37 @@ internal bool setup_output()
 }
 
 
+bool save_cropped_region(CroppedRegion* region, int frame_count, const char* region_name)
+{
+    CreateDirectoryA("ppm", NULL);
 
+    char filename[256];
+    sprintf(filename, "ppm\\debug_%s_frame_%d.ppm", region_name, frame_count);
+    
+    FILE* f = fopen(filename, "wb");
+    if (!f) {
+        printf("\nERROR: Could not open %s for writing", filename);
+        return false;
+    }
+    
+    // Write PPM header (simple image format)
+    fprintf(f, "P6\n%d %d\n255\n", region->width, region->height);
+    
+    // Write BGR data (convert to RGB while writing)
+    for (int y = 0; y < region->height; y++) {
+        for (int x = 0; x < region->width; x++) {
+            uint8_t* pixel = region->data + (y * region->linesize) + (x * 3);
+            // Write RGB (swap BGR to RGB)
+            fputc(pixel[2], f); // R
+            fputc(pixel[1], f); // G  
+            fputc(pixel[0], f); // B
+	}
+    }
+    
+    fclose(f);
+    printf("\nSaved %s to %s (%dx%d)", region_name, filename, region->width, region->height);
+    return true;
+}
 
 
 
@@ -374,27 +475,37 @@ internal bool process_frames()
 
 
   int frame_count = 0;
-  // int64 pts = 0;
 
-  
   // Scalling context for BGRA -> YUV420P conversion 
   struct SwsContext* sws_ctx = NULL;
 
   sws_ctx = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
-  	   recorder.width, recorder.height, AV_PIX_FMT_YUV420P,
-  	   SWS_BILINEAR, NULL, NULL, NULL);
+			   recorder.width, recorder.height, AV_PIX_FMT_YUV420P,
+			   SWS_BILINEAR, NULL, NULL, NULL);
   
-
   if(!sws_ctx)
   {
     printf("\nERROR: Could not create scalling context\n");
     return false;
   }
 
+
+  // Scalling for BGR24 for ROI processing
+  struct SwsContext* sws_ctx_bgr = NULL;
+
+  sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+			       recorder.width, recorder.height, AV_PIX_FMT_BGR24,
+			       SWS_BILINEAR, NULL, NULL, NULL);
+  if(!sws_ctx_bgr)
+  {
+    printf("\nError: Could not create BGR conversion context\n");
+    return false;
+  }
+
   DWORD start_time = GetTickCount();
   int64 pts = 0;
 
-  start_live_recording();
+  // start_live_recording();
 
 
   // Main processing loop
@@ -404,7 +515,7 @@ internal bool process_frames()
     if(GetAsyncKeyState('S') & 0x8001)
     {
       printf("\n'S' key press, stopping manual frame capture...");
-      stop_live_recording();
+      // stop_live_recording();
       break;
     }
 
@@ -449,31 +560,72 @@ internal bool process_frames()
 		    output_frame->data,
 		    output_frame->linesize);
 
-	  // Encode frame
-	  if(avcodec_send_frame(recorder.codec_context, output_frame) >= 0)
+
+	  // Allocate BGR frame for ROI processing
+	  AVFrame* crop_frame = av_frame_alloc();
+	  // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+	  crop_frame->format = AV_PIX_FMT_BGR24;
+	  crop_frame->width = recorder.width;
+	  crop_frame->height = recorder.height;
+
+
+	  if(av_frame_get_buffer(crop_frame, 0) < 0)
 	  {
-	    while(avcodec_receive_packet(recorder.codec_context, output_packet) >=0)
-	    {
-	      // Set packet stream index and rescale timestamps
-	      output_packet->stream_index = recorder.output_stream->index;
-	      av_packet_rescale_ts(output_packet,
-				   recorder.codec_context->time_base,
-				   recorder.output_stream->time_base);
-
-		     // Write packet to output file
-		     if(av_write_frame(recorder.output_container, output_packet) < 0)
-		     {
-		printf("\nERROR: Coudld not write frame");
-
-		     }
-
-	      av_packet_unref(output_packet);
-	    }
+	    printf("\nERROR: could not allocate BGR frame buffer");
+	    av_frame_free(&crop_frame);
+	    break;
 	  }
+
+	  // Convert to BGR24 for region processing
+	  sws_scale(sws_ctx_bgr,
+		    (const uint8* const*)input_frame->data,
+		    input_frame->linesize,
+		    0,
+		    recorder.height,
+		    crop_frame->data,
+		    crop_frame->linesize);
+
+	  // Crop regions for processing
+	  CroppedRegion* name_region = crop_region(crop_frame->data[0],
+						   crop_frame->width,
+						   crop_frame->height,
+						   crop_frame->linesize[0],
+						   recorder.targets[0]);
+
+	      
+
+	  if(!save_cropped_region(name_region, frame_count, "goal_name"))
+	  {
+	    printf("ERROR: save_cropped_region failure");
+	  }
+	  
+	  // Free BGR ROI frames
+	  av_frame_free(&crop_frame);
+
+		//  // Encode frame
+		//  if(avcodec_send_frame(recorder.codec_context, output_frame) >= 0)
+		//  {
+		//    while(avcodec_receive_packet(recorder.codec_context, output_packet) >=0)
+		//    {
+		//      // Set packet stream index and rescale timestamps
+		//      output_packet->stream_index = recorder.output_stream->index;
+		//      av_packet_rescale_ts(output_packet,
+		//  	   recorder.codec_context->time_base,
+		//  	   recorder.output_stream->time_base);
+		//
+		//      // Write packet to output file
+		//      if(av_write_frame(recorder.output_container, output_packet) < 0)
+		//      {
+		// printf("\nERROR: Could not write frame");
+		//      }
+		//
+		//      av_packet_unref(output_packet);
+		//    }
+		//  }
 	  
 	  av_frame_unref(output_frame);
 
-	  if(frame_count % 30 == 0)
+	  if(frame_count % recorder.fps == 0)
 	  {
 	    printf("\nProcessed %d frames", frame_count);
 	  }
@@ -507,6 +659,8 @@ internal bool process_frames()
   av_packet_free(&input_packet);
   av_packet_free(&output_packet);
   avcodec_free_context(&decoder_context);
+  free(recorder.targets);
+
 
   printf("\nFrame processing complete. Total frames: %d", frame_count);
   return true;

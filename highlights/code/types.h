@@ -10,8 +10,6 @@ extern "C" {
 // #include <libavutil/time.h>
 }
 
-
-
 #include <windows.h>
 #include <stdio.h>
 #include <time.h>
@@ -26,8 +24,22 @@ typedef int64_t int64;
 #define global_variable static
 #define internal static
 
+typedef struct
+{
+  int x, y, width, height;
+} ROI;
 
-struct ScreenRecorder 
+
+typedef struct
+{
+  uint8* data;
+  int width, height;
+  int linesize;
+} CroppedRegion;
+
+
+
+typedef struct ScreenRecorder 
 {
     // Containers and streams
     AVFormatContext* input_container;
@@ -39,19 +51,16 @@ struct ScreenRecorder
     AVCodecContext* codec_context;
     const AVCodec* codec;
 
-    int output_index = 0;
-    bool output_ready = false;
-
+    int output_index; 
+    bool output_ready;
 
     int fps;
     int x, y, width, height;
-};
 
-
-struct DdagrabDimensions
-{
-  int x, y, width, height;
-};
+    // Array of ROI structs
+    ROI* targets;
+    int num_targets;
+} ScreenRecorder; 
 
 
 #endif

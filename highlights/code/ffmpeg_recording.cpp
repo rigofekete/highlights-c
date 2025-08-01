@@ -1,5 +1,10 @@
 #include "ffmpeg_recording.h"
 
+global_variable int buffer_seconds = recorder.fps;
+global_variable int segment_duration = 2;
+global_variable char segment_process_running = 0;
+global_variable char live_process_running = 0;
+
 // Start FFmpeg segment recording with ddagrab
 void start_segment_recording() 
 {
@@ -137,6 +142,9 @@ void batch_fix_all_mkv_files()
 
 
 
+
+
+
 void fix_mkv_file(const char* filename) 
 {
     printf("Repairing: %s\n", filename);
@@ -171,6 +179,10 @@ void fix_mkv_file(const char* filename)
         DeleteFileA(temp_name);
     }
 }
+
+
+
+
 
 void batch_crop_all_files_in_live_folder() 
 {
@@ -207,8 +219,18 @@ void batch_crop_all_files_in_live_folder()
 	    {
                 cropped_files++;
                 printf("Cropped: %s\n", findData.cFileName);
+		printf("Removing %s ....", input_path);
+		if(remove(input_path) == 0)
+		{
+		  printf("%s removed successfully", input_path);
+		}
+		else
+		{
+		  printf("%s failed to be removed", input_path);
+		}
             }
-	    else {
+	    else 
+	    {
                 printf("Failed to crop: %s\n", findData.cFileName);
             }
             

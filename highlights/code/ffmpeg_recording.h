@@ -1,9 +1,5 @@
 #include "types.h"
 
-global_variable int buffer_seconds = 30;
-global_variable int segment_duration = 2;
-global_variable char segment_process_running = 0;
-global_variable char live_process_running = 0;
 
 extern ScreenRecorder recorder;
 
@@ -17,9 +13,9 @@ void save_highlight_pre();
 
 // Start live recording with ddagrab
 void start_live_recording();
+
 // Stop live recording
 void stop_live_recording();
-
 
 void fix_mkv_file(const char* filename); 
 
