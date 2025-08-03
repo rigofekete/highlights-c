@@ -40,7 +40,7 @@ internal bool get_dpi_aware_window_rect(const char* window_name)
 
 
 
-bool region_targets(const char* window_name)
+bool set_region_targets(const char* window_name)
 {
   // TODO: Always set the num of targets we will compute and allocate
   recorder.num_targets = 1;
@@ -109,17 +109,21 @@ CroppedRegion* crop_region(uint8* frame_data, int frame_width, int frame_height,
 
 
 
-void free_cropped_region(CroppedRegion* region)
+// Replica of the av_frame_free and av_packer_free like functions where we take the address of the pointer 
+// so we can also null it out of deallocating the internal data
+void free_cropped_region(CroppedRegion** region)
 {
-  if(region)
+  if(region && *region)
   {
-    if(region->data)
+    if((*region)->data)
     {
-      free(region->data);
+      free((*region)->data);
     }
 
-    free(region);
+    free(*region);
+    *region = NULL;
   }
+  return;
 }
 
 
@@ -131,14 +135,14 @@ internal bool capture_screen(const char* window_name)
 	  return false;
   }
 
-  if(!region_targets(window_name))
+  if(!set_region_targets(window_name))
   {
-    printf("ROIs allocation for array failed");
+    printf("ROI targets set up and allocations failed");
     return false;
   }
   else
   {
-    printf("ROIs successfully generated!");
+    printf("ROI targets successfully generated!");
   }
 
 
@@ -210,7 +214,7 @@ internal bool init_screen_recorder(const char* window_name, int fps)
 }
 
 
-internal bool setup_output()
+internal bool setup_recording()
 {
   if(recorder.output_ready)
   {
@@ -347,54 +351,7 @@ internal bool setup_output()
     return false;
   }
 
-  recorder.output_ready = true;
-  printf("\nOutput setup complete");
-  return true;
-}
-
-
-bool save_cropped_region(CroppedRegion* region, int frame_count, const char* region_name)
-{
-    CreateDirectoryA("ppm", NULL);
-
-    char filename[256];
-    sprintf(filename, "ppm\\debug_%s_frame_%d.ppm", region_name, frame_count);
-    
-    FILE* f = fopen(filename, "wb");
-    if (!f) {
-        printf("\nERROR: Could not open %s for writing", filename);
-        return false;
-    }
-    
-    // Write PPM header (simple image format)
-    fprintf(f, "P6\n%d %d\n255\n", region->width, region->height);
-    
-    // Write BGR data (convert to RGB while writing)
-    for (int y = 0; y < region->height; y++) {
-        for (int x = 0; x < region->width; x++) {
-            uint8_t* pixel = region->data + (y * region->linesize) + (x * 3);
-            // Write RGB (swap BGR to RGB)
-            fputc(pixel[2], f); // R
-            fputc(pixel[1], f); // G  
-            fputc(pixel[0], f); // B
-	}
-    }
-    
-    fclose(f);
-    printf("\nSaved %s to %s (%dx%d)", region_name, filename, region->width, region->height);
-    return true;
-}
-
-
-
-internal bool process_frames()
-{
-  if(!setup_output())
-  {
-    printf("\nError preparing ouput container and stream");
-    return false;
-  }
-
+  // Prepare decoder, input/output frames and packets 
 
   printf("\nFinding stream info from format");
 
@@ -404,9 +361,7 @@ internal bool process_frames()
     return false;
   }
 
-
-  int v_stream_index = -1;
-  AVCodecContext* decoder_context = NULL;
+  recorder.v_stream_index = -1;
   AVCodecParameters* local_codec_param = NULL;
   const AVCodec* decoder = NULL;
 
@@ -416,7 +371,7 @@ internal bool process_frames()
 
     if(local_codec_param->codec_type == AVMEDIA_TYPE_VIDEO)
     {
-      v_stream_index = i;
+      recorder.v_stream_index = i;
       decoder = avcodec_find_decoder(local_codec_param->codec_id);
 
       printf("\nVideo Codec: resolution %d x %d",
@@ -427,86 +382,233 @@ internal bool process_frames()
     }
   }
 
-  if(v_stream_index == -1)
+  if(recorder.v_stream_index == -1)
   {
     printf("\nERROR: no streams available");
     return false;
   }
 
-  decoder_context = avcodec_alloc_context3(decoder);
-  if(!decoder_context)
+  recorder.decoder_context = avcodec_alloc_context3(decoder);
+  if(!recorder.decoder_context)
   {
     printf("\nERROR: failed to allocate codec context");
     return false;
   }
 
   avcodec_parameters_to_context(
-		      decoder_context, 
+		      recorder.decoder_context, 
 		      // NOTE: Isn't this the same as the line below? It is the same current index from this loop
 		      local_codec_param
 		      // recorder.input_container->streams[v_stream_index]->codecpar
 		      );
 
-  if(avcodec_open2(decoder_context, decoder, NULL) < 0)
+  if(avcodec_open2(recorder.decoder_context, decoder, NULL) < 0)
   {
     printf("\nERROR: Could not open decoder");
-    avcodec_free_context(&decoder_context);
+    avcodec_free_context(&recorder.decoder_context);
     return false;
   }
   
   // Allocate frames and packets
-  AVFrame* input_frame = av_frame_alloc();
-  AVFrame* output_frame = av_frame_alloc();
-  AVPacket* input_packet = av_packet_alloc();
-  AVPacket* output_packet = av_packet_alloc();
+  recorder.input_frame = av_frame_alloc();
+  recorder.output_frame = av_frame_alloc();
+  recorder.input_packet = av_packet_alloc();
+  recorder.output_packet = av_packet_alloc();
 
-  if(!input_frame || !output_frame || !input_packet || !output_packet) 
+  if(!recorder.input_frame || !recorder.output_frame || !recorder.input_packet || !recorder.output_packet) 
   {
     printf("\nERROR: Could not allocate frames/packets");
-    av_frame_free(&input_frame);
-    av_frame_free(&output_frame);
-    av_packet_free(&input_packet);
-    av_packet_free(&output_packet);
+    av_frame_free(&recorder.input_frame);
+    av_frame_free(&recorder.output_frame);
+    av_packet_free(&recorder.input_packet);
+    av_packet_free(&recorder.output_packet);
     return false;
   }
 
 
-  printf("\nStarting frame processing loop...");
+  // printf("\nStarting frame processing loop...");
 
-
-  int frame_count = 0;
 
   // Scalling context for BGRA -> YUV420P conversion 
-  struct SwsContext* sws_ctx = NULL;
-
-  sws_ctx = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+  recorder.sws_ctx = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
 			   recorder.width, recorder.height, AV_PIX_FMT_YUV420P,
 			   SWS_BILINEAR, NULL, NULL, NULL);
   
-  if(!sws_ctx)
+  if(!recorder.sws_ctx)
   {
     printf("\nERROR: Could not create scalling context\n");
     return false;
   }
 
 
-  // Scalling for BGR24 for ROI processing
-  struct SwsContext* sws_ctx_bgr = NULL;
+  recorder.output_ready = true;
+  printf("\nOutput setup complete");
+  return true;
+}
 
-  sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
-			       recorder.width, recorder.height, AV_PIX_FMT_BGR24,
-			       SWS_BILINEAR, NULL, NULL, NULL);
-  if(!sws_ctx_bgr)
+
+bool decode_set_frame(int frame_count)
+{
+  recorder.output_frame->format = AV_PIX_FMT_YUV420P; 
+  recorder.output_frame->width =  recorder.codec_context->width;
+  recorder.output_frame->height =  recorder.codec_context->height;
+  // output_frame->pts = pts++;
+
+  // Allocate buffer for output frame
+  if(av_frame_get_buffer(recorder.output_frame, 0) < 0)
   {
-    printf("\nError: Could not create BGR conversion context\n");
+    printf("\nERROR: Could not allocate output frame buffer");
     return false;
   }
+  // Convert BGRA to YUV420P using sws_scale
+  sws_scale(recorder.sws_ctx,
+	    (const uint8* const*)recorder.input_frame->data,
+	    recorder.input_frame->linesize,
+	    0,
+	    recorder.height,
+	    recorder.output_frame->data,
+	    recorder.output_frame->linesize);
+
+  return true;
+}
+
+
+bool encode_frame()
+{
+
+  if(avcodec_send_frame(recorder.codec_context, recorder.output_frame) >= 0)
+  {
+   while(avcodec_receive_packet(recorder.codec_context, recorder.output_packet) >=0)
+   {
+     // Set packet stream index and rescale timestamps
+     recorder.output_packet->stream_index = recorder.output_stream->index;
+     av_packet_rescale_ts(recorder.output_packet,
+	   recorder.codec_context->time_base,
+	   recorder.output_stream->time_base);
+
+     // Write packet to output file
+     if(av_write_frame(recorder.output_container, recorder.output_packet) < 0)
+     {
+	printf("\nERROR: Could not write frame");
+     }
+
+     av_packet_unref(recorder.output_packet);
+   }
+  }
+  
+  return true;
+}
+
+
+
+bool save_cropped_region(int frame_count)
+// bool save_cropped_region(CroppedRegion* region, int frame_count, const char* region_name)
+{
+    // BGR24 for ROI processing
+    struct SwsContext* sws_ctx_bgr = NULL;
+
+    sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+				 recorder.width, recorder.height, AV_PIX_FMT_BGR24,
+				 SWS_BILINEAR, NULL, NULL, NULL);
+    if(!sws_ctx_bgr)
+    {
+      printf("\nError: Could not create BGR conversion context\n");
+      return false;
+    }
+
+    // Allocate BGR frame for ROI processing
+    AVFrame* crop_frame = av_frame_alloc();
+    // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+    crop_frame->format = AV_PIX_FMT_BGR24;
+    crop_frame->width = recorder.width;
+    crop_frame->height = recorder.height;
+
+
+    if(av_frame_get_buffer(crop_frame, 0) < 0)
+    {
+      printf("\nERROR: could not allocate BGR frame buffer");
+      av_frame_free(&crop_frame);
+      return false;
+    }
+
+    // Convert to BGR24 for region processing
+    sws_scale(sws_ctx_bgr,
+	      (const uint8* const*)recorder.input_frame->data,
+	      recorder.input_frame->linesize,
+	      0,
+	      recorder.height,
+	      crop_frame->data,
+	      crop_frame->linesize);
+
+    // Crop regions for processing
+    CroppedRegion* name_region = crop_region(crop_frame->data[0],
+					     crop_frame->width,
+					     crop_frame->height,
+					     crop_frame->linesize[0],
+					     recorder.targets[0]);
+
+
+    CreateDirectoryA("ppm", NULL);
+
+    char filename[256];
+    sprintf(filename, "ppm\\debug_%s_frame_%d.ppm", "region", frame_count);
+    
+    FILE* f = fopen(filename, "wb");
+    if (!f) {
+        printf("\nERROR: Could not open %s for writing", filename);
+        return false;
+    }
+    
+    // Write PPM header (simple image format)
+    fprintf(f, "P6\n%d %d\n255\n", name_region->width, name_region->height);
+    
+    // Write BGR data (convert to RGB while writing)
+    for (int y = 0; y < name_region->height; y++) {
+        for (int x = 0; x < name_region->width; x++) {
+            uint8_t* pixel = name_region->data + (y * name_region->linesize) + (x * 3);
+            // Write RGB (swap BGR to RGB)
+            fputc(pixel[2], f); // R
+            fputc(pixel[1], f); // G  
+            fputc(pixel[0], f); // B
+	}
+    }
+    
+    fclose(f);
+    printf("\nSaved %s to %s (%dx%d)", "region", filename, name_region->width, name_region->height);
+
+    // Free BGR ROI frames, regions and pixel color context
+    av_frame_free(&crop_frame);
+    free_cropped_region(&name_region);
+    if(sws_ctx_bgr)
+    {
+      sws_freeContext(sws_ctx_bgr);
+      sws_ctx_bgr = NULL;
+    }
+
+    return true;
+}
+
+
+
+
+
+internal bool process_frames()
+{
+  if(!setup_recording())
+  {
+    printf("\nError preparing ouput container and stream");
+    return false;
+  }
+
+
+  int frame_count = 0;
 
   DWORD start_time = GetTickCount();
   int64 pts = 0;
 
   // start_live_recording();
 
+  printf("\nStarting frame processing loop...");
 
   // Main processing loop
   while(true)
@@ -519,8 +621,8 @@ internal bool process_frames()
       break;
     }
 
-
-    if(av_read_frame(recorder.input_container, input_packet) < 0)
+    
+    if(av_read_frame(recorder.input_container, recorder.input_packet) < 0)
     {
 
       printf("\nEnd of input stream or error");
@@ -528,102 +630,35 @@ internal bool process_frames()
     }
 
     DWORD elapsed_ms = GetTickCount() - start_time;
-    output_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
-    
-    if(input_packet->stream_index == v_stream_index)
+    recorder.output_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+    frame_count++;
+
+    if(recorder.input_packet->stream_index == recorder.v_stream_index)
     {
-      if(avcodec_send_packet(decoder_context, input_packet) >= 0)
+      if(avcodec_send_packet(recorder.decoder_context, recorder.input_packet) >= 0)
       {
-	while(avcodec_receive_frame(decoder_context, input_frame) >= 0)
+	while(avcodec_receive_frame(recorder.decoder_context, recorder.input_frame) >= 0)
 	{
-
-	  frame_count++;
-
-	  output_frame->format = AV_PIX_FMT_YUV420P; 
-	  output_frame->width =  recorder.codec_context->width;
-	  output_frame->height =  recorder.codec_context->height;
-	  // output_frame->pts = pts++;
-
-	  // Allocate buffer for output frame
-	  if(av_frame_get_buffer(output_frame, 0) < 0)
+	  // TODO: Make this a manual live recording function for testing purposes which will flush encoders and trailers internally 
+	  if(!decode_set_frame(frame_count)) 
 	  {
-	    printf("\nERROR: Could not allocate output frame buffer");
-	    break;
+	    printf("Error decoding and setting up frames");
+	    return false;
 	  }
 	  
-	  // Convert BGRA to YUV420P using sws_scale
-	  sws_scale(sws_ctx,
-		    (const uint8* const*)input_frame->data,
-		    input_frame->linesize,
-		    0,
-		    recorder.height,
-		    output_frame->data,
-		    output_frame->linesize);
-
-
-	  // Allocate BGR frame for ROI processing
-	  AVFrame* crop_frame = av_frame_alloc();
-	  // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
-	  crop_frame->format = AV_PIX_FMT_BGR24;
-	  crop_frame->width = recorder.width;
-	  crop_frame->height = recorder.height;
-
-
-	  if(av_frame_get_buffer(crop_frame, 0) < 0)
+	  if(!encode_frame())
 	  {
-	    printf("\nERROR: could not allocate BGR frame buffer");
-	    av_frame_free(&crop_frame);
-	    break;
+	    printf("Error encoding frame");
+	    return false;
 	  }
 
-	  // Convert to BGR24 for region processing
-	  sws_scale(sws_ctx_bgr,
-		    (const uint8* const*)input_frame->data,
-		    input_frame->linesize,
-		    0,
-		    recorder.height,
-		    crop_frame->data,
-		    crop_frame->linesize);
-
-	  // Crop regions for processing
-	  CroppedRegion* name_region = crop_region(crop_frame->data[0],
-						   crop_frame->width,
-						   crop_frame->height,
-						   crop_frame->linesize[0],
-						   recorder.targets[0]);
-
-	      
-
-	  if(!save_cropped_region(name_region, frame_count, "goal_name"))
+	  if(!save_cropped_region(frame_count))
 	  {
-	    printf("ERROR: save_cropped_region failure");
+	    printf("Error cropping frame");
+	    return false;
 	  }
-	  
-	  // Free BGR ROI frames
-	  av_frame_free(&crop_frame);
 
-		//  // Encode frame
-		//  if(avcodec_send_frame(recorder.codec_context, output_frame) >= 0)
-		//  {
-		//    while(avcodec_receive_packet(recorder.codec_context, output_packet) >=0)
-		//    {
-		//      // Set packet stream index and rescale timestamps
-		//      output_packet->stream_index = recorder.output_stream->index;
-		//      av_packet_rescale_ts(output_packet,
-		//  	   recorder.codec_context->time_base,
-		//  	   recorder.output_stream->time_base);
-		//
-		//      // Write packet to output file
-		//      if(av_write_frame(recorder.output_container, output_packet) < 0)
-		//      {
-		// printf("\nERROR: Could not write frame");
-		//      }
-		//
-		//      av_packet_unref(output_packet);
-		//    }
-		//  }
-	  
-	  av_frame_unref(output_frame);
+	  av_frame_unref(recorder.output_frame);
 
 	  if(frame_count % recorder.fps == 0)
 	  {
@@ -633,34 +668,46 @@ internal bool process_frames()
       }
     }
 
-    // Packet cleanup call for resue on each iteration for new frame
-    av_packet_unref(input_packet);
-
+    // Packet cleanup call for reuse on each iteration for new frame
+    av_packet_unref(recorder.input_packet);
   }
 
-  // Flush encoder
+  // TODO: wrap the flush and write trailer into a function as well as the cleanup in a separate one
+  // Flush encoder internal buffers
   avcodec_send_frame(recorder.codec_context, NULL);
-  while(avcodec_receive_packet(recorder.codec_context, output_packet) >= 0)
+  while(avcodec_receive_packet(recorder.codec_context, recorder.output_packet) >= 0)
   {
-    output_packet->stream_index = recorder.output_stream->index;
-    av_packet_rescale_ts(output_packet,
+    recorder.output_packet->stream_index = recorder.output_stream->index;
+    av_packet_rescale_ts(recorder.output_packet,
   	 recorder.codec_context->time_base,
   	 recorder.output_stream->time_base);
-    av_write_frame(recorder.output_container, output_packet);
-    av_packet_unref(output_packet);
+    av_write_frame(recorder.output_container, recorder.output_packet);
+    av_packet_unref(recorder.output_packet);
   }
 
   // Write trailer
+  // flush remaining container data and properly closes the output file
   av_write_trailer(recorder.output_container);
 
   // Cleanup
-  av_frame_free(&input_frame);
-  av_frame_free(&output_frame);
-  av_packet_free(&input_packet);
-  av_packet_free(&output_packet);
-  avcodec_free_context(&decoder_context);
-  free(recorder.targets);
-
+  // NOTE: All of the av free funcs that take ** pointers already check if pointers are NULL 
+  // and also set the pointer to NULL after cleaning since we have the address of the pointer 
+  av_frame_free(&recorder.input_frame);
+  av_frame_free(&recorder.output_frame);
+  av_packet_free(&recorder.input_packet);
+  av_packet_free(&recorder.output_packet);
+  avcodec_free_context(&recorder.decoder_context);
+  // Regular dealloc so we check for NULl and NULL it after cleaning
+  if(recorder.sws_ctx)
+  {
+    sws_freeContext(recorder.sws_ctx);
+    recorder.sws_ctx = NULL;
+  }
+  if(recorder.targets)
+  {
+    free(recorder.targets);
+    recorder.targets = NULL;
+  }
 
   printf("\nFrame processing complete. Total frames: %d", frame_count);
   return true;

@@ -51,6 +51,17 @@ typedef struct ScreenRecorder
     AVCodecContext* codec_context;
     const AVCodec* codec;
 
+    AVCodecContext* decoder_context;
+
+    AVFrame* input_frame;
+    AVFrame* output_frame;
+    AVPacket* input_packet;
+    AVPacket* output_packet;
+
+    int v_stream_index;
+
+    struct SwsContext* sws_ctx;
+
     int output_index; 
     bool output_ready;
 
