@@ -1,7 +1,7 @@
 #include "types.h"
 
 
-extern ScreenRecorder recorder;
+// extern ScreenRecorder recorder;
 
 static char current_recording_timestamp[20];
 

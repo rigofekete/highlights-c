@@ -1,5 +1,8 @@
 #include "recording.h"
 
+
+ScreenRecorder recorder = {};
+
 internal bool get_dpi_aware_window_rect(const char* window_name)
 {
 	// logging("Initializing window: %s", window_name);

@@ -3,7 +3,7 @@
 
 #define FRAME_BUFFER_SIZE 30
 
-ScreenRecorder recorder = {};
+// extern ScreenRecorder recorder;
 // // if compiled in C
 // ScreenRecorder recorder = 0;
 

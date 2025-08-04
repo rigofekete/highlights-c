@@ -74,4 +74,7 @@ typedef struct ScreenRecorder
 } ScreenRecorder; 
 
 
-#endif
+// Main data struct declared globally in recording.cpp
+extern ScreenRecorder recorder;
+
+#endif 
