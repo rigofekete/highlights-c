@@ -1,6 +1,5 @@
 #include "recording.h"
 
-
 ScreenRecorder recorder = {};
 
 internal bool get_dpi_aware_window_rect(const char* window_name)
@@ -719,22 +718,35 @@ internal bool process_frames()
 
 int main(int argc, const char* argv[])
 {
-	if(!init_screen_recorder("Ultimate World Soccer Winning Eleven 7 - Hack Edition", 30))
-	// if(!init_screen_recorder("Pro Evolution Soccer 2", 60))
-	// if(!init_screen_recorder("PCSX2 v2.2.0", 30))
-	{
-		printf("Error capturing screen");
-	}
 
-	process_frames();
+  if(!load_ocr_lib())
+  {
+    printf("Error OCR load lib failure");
+    return 1;
+  }
 
-	printf("\nFixing all MKV files...\n");
-        batch_fix_all_mkv_files();
+  if(!text_detection_init())
+  {
+    printf("Failed to initialize text detection system\n");
+    return 1;
+  }
+
+  if(!init_screen_recorder("Ultimate World Soccer Winning Eleven 7 - Hack Edition", 30))
+  // if(!init_screen_recorder("Pro Evolution Soccer 2", 60))
+  // if(!init_screen_recorder("PCSX2 v2.2.0", 30))
+  {
+	  printf("Error capturing screen");
+  }
+
+  process_frames();
+
+  printf("\nFixing all MKV files...\n");
+  batch_fix_all_mkv_files();
 
 
-	printf("\nCropping all MKV files...\n");
-	batch_crop_all_files_in_live_folder(); 
+  printf("\nCropping all MKV files...\n");
+  batch_crop_all_files_in_live_folder(); 
 
 
-	return 0;
+  return 0;
 }

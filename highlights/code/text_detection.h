@@ -2,7 +2,7 @@
 #define TEXT_DETECTION_H
 
 #include "types.h"
-// #include "ocr_engine.h"
+#include "ocr_engine.h"
 #include <sqlite3.h>
 
 #define DB_PATH "database"
@@ -11,7 +11,7 @@
 // Text detection system structure
 typedef struct {
   sqlite3* conn_player;
-  // OCREngine ocr_engine;
+  OCREngine ocr_engine;
   char db_path[256];
   bool init;
 } TextDetection;
@@ -31,12 +31,12 @@ extern TextDetection txt_detection;
 
 
 // System initialization and cleanup
-internal bool detection_init(void);
-internal bool detection_db(void);
-// internal bool set_ocr(const char* language);
-internal void detection_cleanup(void);
+bool text_detection_init(void);
+internal bool text_detection_set_db(void);
+internal bool text_detection_set_ocr(const char* language);
+internal void text_detection_cleanup(void);
 
-internal bool add_pattern(const char* pattern);
+internal bool text_add_pattern(const char* pattern);
 
 
-#endif
+#endif // TEXT_DETECTION_H

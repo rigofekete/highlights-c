@@ -1,5 +1,7 @@
-#include "types.h"
+#ifndef FFMPEG_RECORDING_H
+#define FFMPEG_RECORDING_H
 
+#include "types.h"
 
 // extern ScreenRecorder recorder;
 
@@ -24,3 +26,5 @@ void batch_fix_all_mkv_files();
 bool crop_video_file(const char* input_file, const char* output_file);
 
 void batch_crop_all_files_in_live_folder(); 
+
+#endif // FFMPEG_RECORDING_H

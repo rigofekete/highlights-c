@@ -7,18 +7,22 @@ global_variable int confidence_threshold = 30;
 
 
 
-internal bool detection_init(void)
+bool text_detection_init(void)
 {
   memset(&txt_detection, 0, sizeof(TextDetection));
 
-  if(!detection_db())
+  if(!text_detection_set_db())
   {
     printf("ERROR: Failed to setup DB\n");
     return false;
   }
 
   // TODO: Setup OCR engine
-  //
+  if(!text_detection_set_ocr("eng"))
+  {
+    printf("ERROR: Failed to setup OCR engine\n");
+    return false;
+  }
 
   txt_detection.init = true;
   printf("Text Detection initialzed successfully\n");
@@ -26,10 +30,7 @@ internal bool detection_init(void)
 }
 
 
-
-
-
-internal bool detection_db(void)
+internal bool text_detection_set_db(void)
 {
   int rc;
   char* err_msg = NULL;
@@ -98,16 +99,47 @@ internal bool detection_db(void)
 
   for(int i = 0; default_patterns[i] != NULL; i++)
   {
-    add_pattern(default_patterns[i]);
+    text_add_pattern(default_patterns[i]);
   }
 
   printf("DB setup completed successfully\n");
   return true;
 }
 
-// internal bool set_ocr(const char* language);
 
-internal bool add_pattern(const char* pattern)
+
+internal bool text_detection_set_ocr(const char* language)
+{
+  if(!ocr_engine_init(&txt_detection.ocr_engine, language))
+  {
+    printf("ERROR: Failed to initialize OCR engine\n");
+    return false;
+  }
+
+  // ocr_engine_config_text(&txt_detection.ocr_engine);
+
+  printf("OCR engine setup completed successfully\n");
+  return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+internal bool text_add_pattern(const char* pattern)
 {
   if(!txt_detection.conn_player || !pattern)
   {

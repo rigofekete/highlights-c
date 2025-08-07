@@ -1,5 +1,9 @@
+#ifndef RECORDING_H
+#define RECORDING_H
+
 #include "ffmpeg_recording.h"
 #include "types.h"
+#include "text_detection.h"
 
 #define FRAME_BUFFER_SIZE 30
 
@@ -30,3 +34,5 @@ internal bool decode_set_frame(int frame_count);
 internal bool encode_frame();
 
 internal bool process_frames();
+
+#endif // RECORDING_H
