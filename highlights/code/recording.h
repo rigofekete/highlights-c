@@ -25,6 +25,7 @@ internal CroppedRegion* crop_region(uint8* frame_data, int frame_width, int fram
 internal void free_cropped_region(CroppedRegion* region);
 
 internal bool save_cropped_region(int frame_count);
+internal bool detect_cropped_region(double timestamp);
 
 internal bool init_screen_recorder(const char* window_name, int fps);
 
