@@ -1,11 +1,7 @@
 #include "recording.h"
 
 ScreenRecorder recorder = {};
-AVFrame* crop_frame = NULL;
-// DetectionResult* result = NULL;  
-CroppedRegion* name_region = NULL;
-// BGR24 for ROI processing
-struct SwsContext* sws_ctx_bgr = NULL;
+CroppedRegion region = {};
 
 internal bool get_dpi_aware_window_rect(const char* window_name)
 {
@@ -525,50 +521,48 @@ internal bool encode_frame()
 
 
 
-internal bool save_cropped_region(int frame_count)
+internal bool save_cropped_region(CroppedRegion* region, int frame_count)
 // bool save_cropped_region(CroppedRegion* region, int frame_count, const char* region_name)
 {
     // BGR24 for ROI processing
-    struct SwsContext* sws_ctx_bgr = NULL;
-
-    sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+    recorder.sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
 				 recorder.width, recorder.height, AV_PIX_FMT_BGR24,
 				 SWS_BILINEAR, NULL, NULL, NULL);
-    if(!sws_ctx_bgr)
+    if(!recorder.sws_ctx_bgr)
     {
       printf("\nError: Could not create BGR conversion context\n");
       return false;
     }
 
     // Allocate BGR frame for ROI processing
-    crop_frame = av_frame_alloc();
-    // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
-    crop_frame->format = AV_PIX_FMT_BGR24;
-    crop_frame->width = recorder.width;
-    crop_frame->height = recorder.height;
+    recorder.crop_frame = av_frame_alloc();
+    // recorder.crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+    recorder.crop_frame->format = AV_PIX_FMT_BGR24;
+    recorder.crop_frame->width = recorder.width;
+    recorder.crop_frame->height = recorder.height;
 
 
-    if(av_frame_get_buffer(crop_frame, 0) < 0)
+    if(av_frame_get_buffer(recorder.crop_frame, 0) < 0)
     {
       printf("\nERROR: could not allocate BGR frame buffer");
-      av_frame_free(&crop_frame);
+      av_frame_free(&recorder.crop_frame);
       return false;
     }
 
     // Convert to BGR24 for region processing
-    sws_scale(sws_ctx_bgr,
+    sws_scale(recorder.sws_ctx_bgr,
 	      (const uint8* const*)recorder.input_frame->data,
 	      recorder.input_frame->linesize,
 	      0,
 	      recorder.height,
-	      crop_frame->data,
-	      crop_frame->linesize);
+	      recorder.crop_frame->data,
+	      recorder.crop_frame->linesize);
 
     // Crop regions for processing
-    CroppedRegion* name_region = crop_region(crop_frame->data[0],
-					     crop_frame->width,
-					     crop_frame->height,
-					     crop_frame->linesize[0],
+    region = crop_region(recorder.crop_frame->data[0],
+					     recorder.crop_frame->width,
+					     recorder.crop_frame->height,
+					     recorder.crop_frame->linesize[0],
 					     recorder.targets[0]);
 
 
@@ -584,12 +578,12 @@ internal bool save_cropped_region(int frame_count)
     }
     
     // Write PPM header (simple image format)
-    fprintf(f, "P6\n%d %d\n255\n", name_region->width, name_region->height);
+    fprintf(f, "P6\n%d %d\n255\n", region->width, region->height);
     
     // Write BGR data (convert to RGB while writing)
-    for (int y = 0; y < name_region->height; y++) {
-        for (int x = 0; x < name_region->width; x++) {
-            uint8_t* pixel = name_region->data + (y * name_region->linesize) + (x * 3);
+    for (int y = 0; y < region->height; y++) {
+        for (int x = 0; x < region->width; x++) {
+            uint8_t* pixel = region->data + (y * region->linesize) + (x * 3);
             // Write RGB (swap BGR to RGB)
             fputc(pixel[2], f); // R
             fputc(pixel[1], f); // G  
@@ -598,103 +592,131 @@ internal bool save_cropped_region(int frame_count)
     }
     
     fclose(f);
-    printf("\nSaved %s to %s (%dx%d)\n", "region", filename, name_region->width, name_region->height);
+    printf("\nSaved %s to %s (%dx%d)\n", "region", filename, region->width, region->height);
 
     // Free BGR ROI frames, regions and pixel color context
-    av_frame_free(&crop_frame);
-    free_cropped_region(&name_region);
-    if(sws_ctx_bgr)
+    av_frame_free(&recorder.crop_frame);
+    free_cropped_region(&region);
+    if(recorder.sws_ctx_bgr)
     {
-      sws_freeContext(sws_ctx_bgr);
-      sws_ctx_bgr = NULL;
+      sws_freeContext(recorder.sws_ctx_bgr);
+      recorder.sws_ctx_bgr = NULL;
     }
 
     return true;
 }
 
 
-
-internal bool detect_cropped_region(double timestamp)
+internal bool detect_cropped_region(CroppedRegion* region, double timestamp)
 // bool save_cropped_region(CroppedRegion* region, int frame_count, const char* region_name)
 {
   if(!recorder.is_recording)
   {
-    sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+    recorder.sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
 				 recorder.width, recorder.height, AV_PIX_FMT_BGR24,
 				 SWS_BILINEAR, NULL, NULL, NULL);
-    if(!sws_ctx_bgr)
+    if(!recorder.sws_ctx_bgr)
     {
       printf("\nError: Could not create BGR conversion context\n");
       return false;
     }
 
     // allocate bgr frame for roi processing
-    crop_frame = av_frame_alloc();
-    // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
-    crop_frame->format = AV_PIX_FMT_BGR24;
-    crop_frame->width = recorder.width;
-    crop_frame->height = recorder.height;
+    recorder.crop_frame = av_frame_alloc();
+    // recorder.crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+    recorder.crop_frame->format = AV_PIX_FMT_BGR24;
+    recorder.crop_frame->width = recorder.width;
+    recorder.crop_frame->height = recorder.height;
 
 
-    if(av_frame_get_buffer(crop_frame, 0) < 0)
+    if(av_frame_get_buffer(recorder.crop_frame, 0) < 0)
     {
       printf("\nERROR: could not allocate BGR frame buffer");
-      av_frame_free(&crop_frame);
+      av_frame_free(&recorder.crop_frame);
       return false;
     }
 
     // Convert to BGR24 for region processing
-    sws_scale(sws_ctx_bgr,
+    sws_scale(recorder.sws_ctx_bgr,
 	      (const uint8* const*)recorder.input_frame->data,
 	      recorder.input_frame->linesize,
 	      0,
 	      recorder.height,
-	      crop_frame->data,
-	      crop_frame->linesize);
+	      recorder.crop_frame->data,
+	      recorder.crop_frame->linesize);
 
     // Crop regions for processing
-    name_region = crop_region(crop_frame->data[0],
-					     crop_frame->width,
-					     crop_frame->height,
-					     crop_frame->linesize[0],
-					     recorder.targets[0]);
+    region = crop_region(recorder.crop_frame->data[0],
+			 recorder.crop_frame->width,
+			 recorder.crop_frame->height,
+			 recorder.crop_frame->linesize[0],
+			 recorder.targets[0]);
     
     recorder.start_time_rec = time(NULL);
 
-    DetectionResult* result = text_detection_process_region(name_region, timestamp); 
-    // result = text_detection_process_region(name_region, timestamp); 
-    if(result && result->is_target)
+    if(!text_detection_is_uniform(region, 15))
     {
-      recorder.is_recording = true;
-      start_live_recording();
-      printf("Detected pattern! Starting live recording!");
-      // return true;
-    } 
-    // else
-    // {
-    //   free(result);
-    //   result = NULL;
-    // }
-  
-
-    // Free BGR ROI frames, regions and pixel color context
-    if(crop_frame)
-    {
-      av_frame_free(&crop_frame);
+      printf("\nNON-UNIFORM REGION - PROCESSING ....\n");
+      DetectionResult* result = text_detection_process_region(region, timestamp); 
+      // result = text_detection_process_region(region, timestamp); 
+      if(result && result->is_target)
+      {
+	recorder.is_recording = true;
+	start_live_recording();
+	free(result);
+	result = NULL;
+	printf("DETECTED PATTERN! STARTING LIVE RECORDING!");
+	// return true;
+      } 
+      else
+      {
+	free(result);
+	result = NULL;
+      }
     }
      
-    if(name_region)
-    {
-      free_cropped_region(&name_region);
-    }
-
-    if(sws_ctx_bgr)
-    {
-      sws_freeContext(sws_ctx_bgr);
-      sws_ctx_bgr = NULL;
-    }
-    
+    // // Free BGR ROI frames, regions and pixel color context
+    // if(recorder.crop_frame)
+    // {
+    //   av_frame_free(&recorder.crop_frame);
+    // }
+    //
+    // if(region)
+    // {
+    //   free_cropped_region(&region);
+    // }
+    //
+    // if(recorder.sws_ctx_bgr)
+    // {
+    //   sws_freeContext(recorder.sws_ctx_bgr);
+    //   recorder.sws_ctx_bgr = NULL;
+    // }
+  } 
+  else if (time(NULL) - recorder.start_time_rec >= recorder.timeout)
+  {
+    stop_live_recording();
+    recorder.is_recording = false;
+    printf("Stopping live recording....");
   }
+
+
+  // Free BGR ROI frames, regions and pixel color context
+  if(recorder.crop_frame)
+  {
+    av_frame_free(&recorder.crop_frame);
+  }
+   
+  if(region)
+  {
+    free_cropped_region(&region);
+  }
+
+  if(recorder.sws_ctx_bgr)
+  {
+    sws_freeContext(recorder.sws_ctx_bgr);
+    recorder.sws_ctx_bgr = NULL;
+  }
+
   return true;
 }
 
@@ -706,49 +728,49 @@ internal bool detect_cropped_region(double timestamp)
 // {
 //   if(!recorder.is_recording)
 //   {
-//     sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
+//     recorder.sws_ctx_bgr = sws_getContext(recorder.width, recorder.height, AV_PIX_FMT_BGRA,
 // 				 recorder.width, recorder.height, AV_PIX_FMT_BGR24,
 // 				 SWS_BILINEAR, NULL, NULL, NULL);
-//     if(!sws_ctx_bgr)
+//     if(!recorder.sws_ctx_bgr)
 //     {
 //       printf("\nError: Could not create BGR conversion context\n");
 //       return false;
 //     }
 //
 //     // allocate bgr frame for roi processing
-//     crop_frame = av_frame_alloc();
-//     // crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
-//     crop_frame->format = AV_PIX_FMT_BGR24;
-//     crop_frame->width = recorder.width;
-//     crop_frame->height = recorder.height;
+//     recorder.crop_frame = av_frame_alloc();
+//     // recorder.crop_frame->pts = av_rescale_q(elapsed_ms, {1, 1000}, recorder.codec_context->time_base);
+//     recorder.crop_frame->format = AV_PIX_FMT_BGR24;
+//     recorder.crop_frame->width = recorder.width;
+//     recorder.crop_frame->height = recorder.height;
 //
 //
-//     if(av_frame_get_buffer(crop_frame, 0) < 0)
+//     if(av_frame_get_buffer(recorder.crop_frame, 0) < 0)
 //     {
 //       printf("\nERROR: could not allocate BGR frame buffer");
-//       av_frame_free(&crop_frame);
+//       av_frame_free(&recorder.crop_frame);
 //       return false;
 //     }
 //
 //     // Convert to BGR24 for region processing
-//     sws_scale(sws_ctx_bgr,
+//     sws_scale(recorder.sws_ctx_bgr,
 // 	      (const uint8* const*)recorder.input_frame->data,
 // 	      recorder.input_frame->linesize,
 // 	      0,
 // 	      recorder.height,
-// 	      crop_frame->data,
-// 	      crop_frame->linesize);
+// 	      recorder.crop_frame->data,
+// 	      recorder.crop_frame->linesize);
 //
 //     // Crop regions for processing
-//     name_region = crop_region(crop_frame->data[0],
-// 					     crop_frame->width,
-// 					     crop_frame->height,
-// 					     crop_frame->linesize[0],
+//     region = crop_region(recorder.crop_frame->data[0],
+// 					     recorder.crop_frame->width,
+// 					     recorder.crop_frame->height,
+// 					     recorder.crop_frame->linesize[0],
 // 					     recorder.targets[0]);
 //
 //     recorder.start_time_rec = time(NULL);
 //
-//     result = text_detection_process_region(name_region, timestamp); 
+//     result = text_detection_process_region(region, timestamp); 
 //     if(result && result->is_target)
 //     {
 //       recorder.is_recording = true;
@@ -777,20 +799,20 @@ internal bool detect_cropped_region(double timestamp)
 //     if(!recorder.is_recording)
 //     {
 //       // Free BGR ROI frames, regions and pixel color context
-//       if(crop_frame)
+//       if(recorder.crop_frame)
 //       {
-// 	av_frame_free(&crop_frame);
+// 	av_frame_free(&recorder.crop_frame);
 //       }
 //
-//       if(name_region)
+//       if(region)
 //       {
-// 	free_cropped_region(&name_region);
+// 	free_cropped_region(&region);
 //       }
 //
-//       if(sws_ctx_bgr)
+//       if(recorder.sws_ctx_bgr)
 //       {
-// 	sws_freeContext(sws_ctx_bgr);
-// 	sws_ctx_bgr = NULL;
+// 	sws_freeContext(recorder.sws_ctx_bgr);
+// 	recorder.sws_ctx_bgr = NULL;
 //       }
 //     }
 //   }
@@ -854,20 +876,20 @@ internal bool process_frames()
 	    return false;
 	  }
 	  
-	  // // if(frame_count % 30 == 0)
-	  // if(frame_count % recorder.fps == 0)
-	  // {
-	  //   if(!save_cropped_region(frame_count))
-	  //   {
-	  //     printf("Error cropping frame");
-	  //     return false;
-	  //   }
-	  // }
-	  //
+	  if(frame_count % 30 == 0)
+	  if(frame_count % recorder.fps == 0)
+	  {
+	    if(!save_cropped_region(&region, frame_count))
+	    {
+	      printf("Error cropping frame");
+	      return false;
+	    }
+	  }
+
 	  // if(frame_count % recorder.fps == 0)
 	  // {
 	  //   double timestamp = elapsed_ms / 1000.0;
-	  //   if(!detect_cropped_region(timestamp))
+	  //   if(!detect_cropped_region(&region, timestamp))
 	  //   {
 	  //     printf("\nERROR: Detection of cropped region failed\n");
 	  //     return false;
@@ -875,7 +897,7 @@ internal bool process_frames()
 	  // }
 
 	  double timestamp = elapsed_ms;
-	  if(!detect_cropped_region(timestamp))
+	  if(!detect_cropped_region(&region, timestamp))
 	  {
 	    printf("\nERROR: Detection of cropped region failed\n");
 	    return false;

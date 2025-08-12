@@ -46,6 +46,7 @@ internal bool text_detection_get_recent_detections(int limit);
 DetectionResult* text_detection_process_region(CroppedRegion* region, double timestamp);
 internal bool text_detection_process_multi_regions(CroppedRegion** regions, int count, double timestamp);
 internal void text_detection_free_result(DetectionResult* result);
+bool text_detection_is_uniform(CroppedRegion* region, int variation_threshold);
 
 // Config
 void text_detection_config_game(void);

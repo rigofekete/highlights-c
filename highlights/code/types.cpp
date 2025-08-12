@@ -85,5 +85,7 @@ bool load_ocr_lib(void)
     return false;
   }
 
+  printf("\nTesseract functions dynamically loaded successfully\n");
+
   return true;
 }

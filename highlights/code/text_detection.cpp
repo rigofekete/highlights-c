@@ -282,6 +282,73 @@ internal bool text_detection_is_pattern(const char* text)
 
 
 
+bool text_detection_is_uniform(CroppedRegion* region, int variation_threshold)
+{
+  if(!region || !region->data) 
+  {
+    printf("\nNo region or empty data\n");
+    return true;
+  }
+
+  // Sample pixels across the region for speed
+  int sample_count = 0;
+  int total_variation = 0;
+  // Sample every 45th pixel for speed
+  int step = 45;
+
+  // Get reference pixel (first pixel)
+  uint8 ref_r = region->data[0];
+  uint8 ref_g = region->data[1];
+  uint8 ref_b = region->data[2];
+
+  // Check variation across the region
+  for(int i = 0; i < region->width * region->height * 3; i += step)
+  {
+    // Condition to check if the 3rd byte (b channel from rgb) for the current pixel 
+    // overflows the total buffer data / region data array size 
+    if(i + 2 >= region->width * region->height * 3)
+    {
+      printf("\nBuffer overflow... stopping uniform detection\n");
+      break;
+    }
+
+    uint8 r = region->data[i];
+    uint8 g = region->data[i + 1];
+    uint8 b = region->data[i + 2];
+
+    // Calculate color difference from ref pixel
+    int variation = abs(r - ref_r) + abs(g - ref_g) + abs(b - ref_b);
+    total_variation += variation;
+    sample_count++;
+
+    // Early exit if we find significant variation
+    if(sample_count >= 20 && total_variation > variation_threshold)
+    {
+      // // NOTE: Debug print block 
+      // int avg_variation = total_variation / sample_count;
+      // printf("(inner) Region variation: %d (threshold: %d) - %s\n",
+      // avg_variation, variation_threshold,
+      // avg_variation <= variation_threshold ? "UNIFORM" : "HAS CONTENT");
+      return true;
+    }
+  }
+
+  if(sample_count == 0)
+  {
+    return true;
+  }
+
+  // Calculate average variation per pixel
+  int avg_variation = total_variation / sample_count;
+
+  // NOTE: Debugging print log
+  printf("Region variation: %d (threshold: %d) - %s\n",
+	 avg_variation, variation_threshold,
+	 avg_variation <= variation_threshold ? "UNIFORM" : "HAS CONTENT");
+
+  // Low variation means uniform background 
+  return avg_variation <= variation_threshold; 
+}
 
 
 

@@ -61,7 +61,8 @@ typedef int64_t int64;
 // #define OCR_ENGINE_SET_IMG(name)  void name(TessBaseAPI *handle, const unsigned char* imagedata, int width, int height, int bytes_per_pixel, int bytes_per_line);
 // typedef OCR_ENGINE_SET_IMG(TessBaseAPISetImage_t);
 //
-// #define OCR_ENGINE_GET_TEXT(name)  char* name(TessBaseAPI *handle);
+// #define OCR_ENGINE_GET_TEXT(name)  char* __cdecl name(TessBaseAPI *handle);
+// // #define OCR_ENGINE_GET_TEXT(name)  char* name(TessBaseAPI *handle);
 // typedef OCR_ENGINE_GET_TEXT(TessBaseAPIGetUTF8Text_t);
 //
 // #define OCR_ENGINE_MEAN(name)  int name(TessBaseAPI *handle);
@@ -89,7 +90,7 @@ typedef int64_t int64;
 // extern TessBaseAPIEnd_t* TessBaseAPIEnd;
 //
 // bool load_ocr_lib(void);
-//
+
 typedef struct
 {
   int x, y, width, height;
@@ -121,12 +122,14 @@ typedef struct ScreenRecorder
 
     AVFrame* input_frame;
     AVFrame* output_frame;
+    AVFrame* crop_frame;
     AVPacket* input_packet;
     AVPacket* output_packet;
 
     int v_stream_index;
 
     struct SwsContext* sws_ctx;
+    struct SwsContext* sws_ctx_bgr;
 
     int output_index; 
     bool output_ready;

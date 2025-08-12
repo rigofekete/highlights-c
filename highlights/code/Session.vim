@@ -13,15 +13,15 @@ if &shortmess =~ 'A'
 else
   set shortmess=aoO
 endif
-badd +0 recording.cpp
-badd +0 types.cpp
-badd +0 types.h
-badd +0 ocr_engine.cpp
-badd +0 ocr_engine.h
-badd +0 text_detection.cpp
-badd +0 text_detection.h
-badd +0 recording.n
-badd +0 recording.h
+badd +692 recording.cpp
+badd +1 types.cpp
+badd +1 types.h
+badd +1 ocr_engine.cpp
+badd +1 ocr_engine.h
+badd +1 text_detection.cpp
+badd +1 text_detection.h
+badd +1 recording.n
+badd +1 recording.h
 argglobal
 %argdel
 $argadd recording.cpp
@@ -34,8 +34,9 @@ tabnew +setlocal\ bufhidden=wipe
 tabnew +setlocal\ bufhidden=wipe
 tabnew +setlocal\ bufhidden=wipe
 tabrewind
-edit recording.cpp
+edit recording.h
 argglobal
+balt recording.cpp
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -46,17 +47,17 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 763 - ((45 * winheight(0) + 34) / 68)
+let s:l = 36 - ((35 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 763
-normal! 0
+keepjumps 36
+normal! 048|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
-edit /mnt/c/dev/highlights-c/highlights/code/recording.h
+edit /mnt/c/dev/highlights-c/highlights/code/recording.cpp
 argglobal
-balt /mnt/c/dev/highlights-c/highlights/code/recording.cpp
+balt /mnt/c/dev/highlights-c/highlights/code/recording.h
 setlocal foldmethod=manual
 setlocal foldexpr=0
 setlocal foldmarker={{{,}}}
@@ -67,12 +68,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 12 - ((11 * winheight(0) + 34) / 68)
+let s:l = 689 - ((28 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 12
-normal! 031|
+keepjumps 689
+normal! 03|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/ocr_engine.cpp
@@ -88,12 +89,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 32 - ((31 * winheight(0) + 27) / 54)
+let s:l = 109 - ((18 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 32
-normal! 0
+keepjumps 109
+normal! 064|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/ocr_engine.h
@@ -109,12 +110,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 6 - ((5 * winheight(0) + 34) / 68)
+let s:l = 5 - ((4 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 6
-normal! 0
+keepjumps 5
+normal! 026|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/text_detection.cpp
@@ -130,12 +131,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 13 - ((0 * winheight(0) + 34) / 68)
+let s:l = 329 - ((39 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 13
-normal! 0
+keepjumps 329
+normal! 023|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/text_detection.h
@@ -151,12 +152,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 46 - ((45 * winheight(0) + 34) / 68)
+let s:l = 47 - ((46 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 46
-normal! 0
+keepjumps 47
+normal! 080|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/types.cpp
@@ -172,12 +173,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 7 - ((6 * winheight(0) + 34) / 68)
+let s:l = 74 - ((19 * winheight(0) + 27) / 54)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 7
-normal! 050|
+keepjumps 74
+normal! 03|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/types.h
@@ -193,14 +194,14 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 26 - ((0 * winheight(0) + 34) / 68)
+let s:l = 144 - ((67 * winheight(0) + 51) / 102)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 26
-normal! 0
+keepjumps 144
+normal! 026|
 lcd /mnt/c/dev/highlights-c/highlights/code
-tabnext 3
+tabnext 2
 set stal=1
 if exists('s:wipebuf') && len(win_findbuf(s:wipebuf)) == 0 && getbufvar(s:wipebuf, '&buftype') isnot# 'terminal'
   silent exe 'bwipe ' . s:wipebuf

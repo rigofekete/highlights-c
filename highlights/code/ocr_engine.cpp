@@ -128,6 +128,9 @@ OCRResult* ocr_detect_txt_region(OCREngine* engine, CroppedRegion* region)
 	  result->text = cleaned_text; //  Pass pointer ownership and let the caller free it 
 	  cleaned_text = NULL;
 	  result->valid = true;
+	  result->confidence = TessBaseAPIMeanTextConf(engine->api);
+	  // NOTE: Left this here for debugging 
+	  // printf("\nOCR detected: '%s' (confidence: %d%%)\n", result->text, result->confidence);
 	}
 	else
 	{
@@ -136,9 +139,6 @@ OCRResult* ocr_detect_txt_region(OCREngine* engine, CroppedRegion* region)
 	}
     }
     
-    
-    // Confidence
-    result->confidence = TessBaseAPIMeanTextConf(engine->api);
 
     clock_t end_time = clock();
     // TODO: Check this line and why are we computing it like that 
@@ -154,102 +154,6 @@ OCRResult* ocr_detect_txt_region(OCREngine* engine, CroppedRegion* region)
     return result;
 }
 
-
-//
-// OCRResult* ocr_detect_txt_region(OCREngine* engine, CroppedRegion* region)
-// {
-//   OCRResult* result = (OCRResult*)malloc(sizeof(OCRResult));
-//   if(!result)
-//   {
-//     printf("ERROR: Could not allocate OCR result\n");
-//     return NULL;
-//   }
-//
-//   // Init result
-//   result->text = NULL;
-//   result->confidence = 0;
-//   result->valid = false;
-//   result->processing_time_ms = 0.0;
-//
-//   if(!engine || !engine->init || !region)
-//   {
-//     printf("ERROR: Invalid engine or region\n");
-//     return result;
-//   }
-//
-//   clock_t start_time = clock();
-//
-//   // Convert BGR24 to RGB24 for Tesseract
-//   uint8* rgb_data = (uint8*)malloc(region->height * region->width * 3);
-//   if(!rgb_data)
-//   {
-//     printf("ERROR: Could not allocate RGB conversion buffer\n");
-//     return result;
-//   }
-//
-//   // TODO: Check if Tesseract has a more efficient way of doing this conversion as we are 
-//   // doing it pixel by pixel here
-//   // Convert BGR to RGB
-//   for(int y = 0; y < region->height; y++)
-//   {
-//     for(int x = 0; x < region->width; x++)
-//     {
-//       // Source
-//       // NOTE: accounting for padding, hence the use of linesize (stride) 
-//       // to get distance in bytes between each row
-//       int bgr_offset = (y * region->linesize) + (x * 3);
-//       // Destination 
-//       int rgb_offset = (y * region->width * 3) + (x * 3);
-//
-//       // R (destination) = R (source)
-//       rgb_data[rgb_offset + 0] = region->data[bgr_offset + 2]; 
-//       // G (destination) = G (source)
-//       rgb_data[rgb_offset + 1] = region->data[bgr_offset + 1];
-//       // B (destination) = B (source)
-//       rgb_data[rgb_offset + 2] = region->data[bgr_offset + 0];
-//     }
-//   }
-//
-//   TessBaseAPISetImage(engine->api, region->data,
-// 		      region->width,
-// 		      region->height,
-// 		      3,
-// 		      region->linesize); // this is already tight
-//
-//   // // Set image data for Tesseract
-//   // TessBaseAPISetImage(engine->api, rgb_data, region->width, region->height, 3, region->width * 3);
-//
-//   // Get OCR result
-//   char* ocr_text = TessBaseAPIGetUTF8Text(engine->api);
-//   if(ocr_text)
-//   {
-//     // Clean the detected text
-//     char* cleaned_text = ocr_clean_text(ocr_text);
-//     if(cleaned_text && strlen(cleaned_text) > 0)
-//     {
-//       result->text = cleaned_text;
-//       result->confidence = TessBaseAPIMeanTextConf(engine->api);
-//       // Minimum 30% confidence 
-//       result->valid = (result->confidence > 30);
-//
-//       printf("OCR detected: '%s' (confidence: %d%%)\n", result->text, result->confidence);
-//
-//     }
-//     else 
-//     {
-//       free(cleaned_text);
-//     }
-//
-//     TessDeleteText(ocr_text);
-//   }
-//
-//   free(rgb_data);
-//
-//   clock_t end_time = clock();
-//   result->processing_time_ms = ((double)(end_time - start_time) / CLOCKS_PER_SEC) * 1000.0;
-//
-//   return result;
-// }
 
 char* ocr_clean_text(const char* raw_text)
 {
