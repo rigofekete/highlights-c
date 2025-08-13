@@ -68,12 +68,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 689 - ((28 * winheight(0) + 31) / 63)
+let s:l = 13 - ((12 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 689
-normal! 03|
+keepjumps 13
+normal! 017|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/ocr_engine.cpp
@@ -89,12 +89,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 109 - ((18 * winheight(0) + 31) / 63)
+let s:l = 149 - ((38 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 109
-normal! 064|
+keepjumps 149
+normal! 037|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/ocr_engine.h
@@ -131,12 +131,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 329 - ((39 * winheight(0) + 31) / 63)
+let s:l = 350 - ((47 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 329
-normal! 023|
+keepjumps 350
+normal! 029|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/text_detection.h
@@ -152,12 +152,12 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 47 - ((46 * winheight(0) + 31) / 63)
+let s:l = 45 - ((44 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 47
-normal! 080|
+keepjumps 45
+normal! 028|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext
 edit /mnt/c/dev/highlights-c/highlights/code/types.cpp
@@ -173,7 +173,7 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 74 - ((19 * winheight(0) + 27) / 54)
+let s:l = 74 - ((22 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
@@ -194,11 +194,11 @@ setlocal foldnestmax=20
 setlocal foldenable
 silent! normal! zE
 let &fdl = &fdl
-let s:l = 144 - ((67 * winheight(0) + 51) / 102)
+let s:l = 138 - ((62 * winheight(0) + 31) / 63)
 if s:l < 1 | let s:l = 1 | endif
 keepjumps exe s:l
 normal! zt
-keepjumps 144
+keepjumps 138
 normal! 026|
 lcd /mnt/c/dev/highlights-c/highlights/code
 tabnext 2
@@ -215,7 +215,6 @@ if filereadable(s:sx)
 endif
 let &g:so = s:so_save | let &g:siso = s:siso_save
 set hlsearch
-nohlsearch
 doautoall SessionLoadPost
 unlet SessionLoad
 " vim: set ft=vim :
